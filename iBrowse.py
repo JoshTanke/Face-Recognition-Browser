@@ -7,7 +7,8 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QAc
 import face_recognize
 import create_database
 import _thread
-import pycalc
+import speech_recognition as sr
+import database
 
 
 
@@ -24,9 +25,13 @@ class DevBox(QWidget):
 		self.textbox.setPlaceholderText("Enter a command.  Type 'help' for options.")
 		self.textbox.returnPressed.connect(self.devGo)
 
+		self.voiceButton = QPushButton('Audio', self)
+		self.voiceButton.clicked.connect(self.voiceCommand)
+
 		self.layout = QVBoxLayout(self)
 		self.layout.addWidget(self.label)
 		self.layout.addWidget(self.textbox)
+		self.layout.addWidget(self.voiceButton)
 
 		self.show()
 
@@ -41,15 +46,47 @@ class DevBox(QWidget):
 			self.textbox.setText('')
 			self.ww.addSite()
 
-		elif self.textbox.text()[0:7] == 'addUser':
+		elif self.textbox.text() == 'clearData':
+			self.textbox.setText('')
+			database.deleteUser(self.ww.name)
+			database.addUser(self.ww.name)
+			self.ww.websites = ['google https://www.google.com/']
+			self.ww.websitesDictionary = {'google': 'https://www.google.com/'}
+			self.ww.homeScreen()
 
+
+		elif self.textbox.text()[0:7] == 'addUser':
+			
 			name = self.textbox.text()[8:-1]
 			_thread.start_new_thread(face_recognize.addUser, (name, ))
 			self.ww.name = name
+			database.addUser(name.title())
+			self.textbox.setText('')
 			self.ww.homeScreen()
 
-		elif self.textbox.text() == 'pyCalc':
-			_thread.start_new_thread(pycalc.openCalc, (self.ww.name, ))
+
+	def voiceCommand(self):
+
+		self.label.setText('Please say a command.')
+
+		self.r = sr.Recognizer()
+		with sr.Microphone() as source:
+			audio = self.r.listen(source)
+
+		if 'go to' in self.r.recognize_google(audio):
+			items = self.r.recognize_google(audio).split()
+			print(items)
+			self.goto(items[2].lower())
+
+
+	def goto(self, address):
+		if address in self.ww.websitesDictionary:
+			self.ww.changeUrl(self.ww.websitesDictionary[address])
+		elif address == 'home':
+			self.ww.homeScreen()
+		else:
+			self.label.setText("I don't recognize that website.")
+
 
 
 class SearchBar(QWidget):
@@ -109,10 +146,18 @@ class WebWindow(QWebEngineView):
 
 	def __init__(self, name):
 		super().__init__()
+
 		
 		self.name = name
-		self.websites = [['https://www.youtube.com/', 'YouTube'], 
-			['https://www.google.com/', 'Google'], ['https://www.facebook.com/', 'Facebook']]
+		self.websites = database.getUserData(self.name)
+		if self.name != None:
+			self.websites = list(self.websites[0][1:5])
+			print(self.websites)
+		else:
+			self.websites = ['google https://www.google.com/']
+
+		self.websitesDictionary = {'google': 'https://www.google.com/'}
+
 		self.nextUrl = None
 		self.previousUrl = None
 		self.homeScreen()
@@ -148,17 +193,21 @@ class WebWindow(QWebEngineView):
         	</html>
     		"""
 		
-		for i in range(len(self.websites)):
-			html += """<img width="50" height="50" src="https://www.""" + self.websites[i][1] + """.com/favicon.ico"><a href=" """ + self.websites[i][0] + """">""" + self.websites[i][1] + """</a></img><br>"""
+		for item in self.websites:
+			if len(item) > 0:
+				parts = item.split()
+				html += """<img width="50" height="50" src="https://www.""" + parts[0] + """.com/favicon.ico"><a href=" """ + parts[1] + """">""" + parts[0] + """</a></img><br>"""
 
 		self.setHtml(html)
 
 	def addSite(self):
 		if self.currentUrl != None:
 			parts = self.currentUrl.split('.')
-			siteInfo = [self.currentUrl, parts[1]]
+			siteInfo = parts[1] + ' ' + self.currentUrl
 			if siteInfo not in self.websites:
+				database.updateUser(self.name, siteInfo)
 				self.websites.append(siteInfo)	
+				self.websitesDictionary[parts[1]] = self.currentUrl
 
 		
 
@@ -190,12 +239,12 @@ def main():
 	
 	name = face_recognize.checkFace()
 
-	if name != None:
-		name = name.title()
 
 	app = QApplication(sys.argv)
 	main = MainWindow(name)
 	app.exec()
+
+	
 
 if __name__ == "__main__":
 	main()
