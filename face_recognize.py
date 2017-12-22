@@ -4,7 +4,7 @@ haar_file = 'haarcascade_frontalface_default.xml'
 image_data = 'image_data'
 
 def checkFace():
-    # Create a list of images and a list of corresponding names
+    #Create a list of images and a list of corresponding names
     (images, lables, names, id) = ([], [], {}, 0)
     for (subdirs, dirs, files) in os.walk(image_data):
         for subdir in dirs:
@@ -20,15 +20,14 @@ def checkFace():
 
     if id == 0:
         return None
-    # Create a Numpy array from the two lists above
+    #Create a Numpy array from the two lists above
     (images, lables) = [numpy.array(lis) for lis in [images, lables]]
 
-    # OpenCV trains a model from the images
-    # NOTE FOR OpenCV2: remove '.face'
+    #OpenCV trains a model from the images
     model = cv2.face.FisherFaceRecognizer_create()
     model.train(images, lables)
 
-    # Part 2: Use fisherRecognizer on camera stream
+    #Use fisherRecognizer on camera stream to compare current user to image data
     face_cascade = cv2.CascadeClassifier(haar_file)
     webcam = cv2.VideoCapture(0)
     count = 1
@@ -50,6 +49,8 @@ def checkFace():
         
     return None
 
+
+#alternative function for adding user (see create_database for other)
 def addUser(name):
 
     haar_file = 'haarcascade_frontalface_default.xml'
